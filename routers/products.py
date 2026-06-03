@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional, List
@@ -12,12 +12,16 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ProductResponse])
 async def get_products(
+    response: Response,
     category: Optional[str] = None,
     sous_category: Optional[str] = None,
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Get all products with optional filtering by category, sous-category and search"""
+    # Cache public 60 s — revalide en arrière-plan (stale-while-revalidate)
+    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=120"
+
     stmt = select(Product)
     if category:
         stmt = stmt.where(Product.category == category)
