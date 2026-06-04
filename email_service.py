@@ -139,53 +139,188 @@ def _wrap(content: str) -> str:
 </html>"""
 
 
+_DELIVERY_LABELS = {
+    "domicile":  "🏠 Livraison à domicile",
+    "retrait":   "🏪 Retrait en boutique",
+    "personnel": "🚚 Livraison personnelle",
+}
+
+
+def _section_title(title: str) -> str:
+    return f"""
+    <h2 style="margin:28px 0 12px;font-size:11px;font-weight:800;color:{C_MUTED};
+               text-transform:uppercase;letter-spacing:2px;border-bottom:1px solid {C_BORDER};
+               padding-bottom:8px">
+      {title}
+    </h2>"""
+
+
+def _row(label: str, value: str, bold: bool = False, color: str = "") -> str:
+    val_style = f"font-weight:{'800' if bold else '500'};color:{color if color else C_TEXT}"
+    return f"""
+    <tr>
+      <td style="padding:9px 0;font-size:13px;color:{C_MUTED};width:45%">{label}</td>
+      <td style="padding:9px 0;font-size:13px;{val_style};text-align:right">{value}</td>
+    </tr>"""
+
+
+def _info_table(rows: list[tuple]) -> str:
+    cells = "".join(_row(label, value, bold, color) for label, value, bold, color in rows)
+    return f"""
+    <table style="width:100%;border-collapse:collapse">
+      {cells}
+    </table>"""
+
+
+def _choices_section(order_data: dict) -> str:
+    """Bloc visuel clair des choix du client."""
+    delivery_raw   = order_data.get("delivery_method") or ""
+    delivery_label = _DELIVERY_LABELS.get(delivery_raw, delivery_raw or "Non précisé")
+    delivery_fee   = order_data.get("delivery_fee") or 0
+    fee_txt        = f"+{delivery_fee:,.0f} FCFA" if delivery_fee else "Gratuit"
+    payment        = order_data.get("payment_method") or "—"
+
+    # Icône paiement
+    if "Wave" in payment:
+        pay_icon = "📱"
+    else:
+        pay_icon = "💵"
+
+    return f"""
+    <table style="width:100%;border-collapse:collapse;margin:4px 0">
+      <tr>
+        <td style="padding:12px 14px;background:{C_BG};border-radius:8px 0 0 8px;
+                   border:1px solid {C_BORDER};border-right:none;width:50%;vertical-align:top">
+          <p style="margin:0;font-size:10px;color:{C_MUTED};text-transform:uppercase;
+                    font-weight:700;letter-spacing:1px">Livraison choisie</p>
+          <p style="margin:6px 0 0;font-size:14px;color:{C_DARK};font-weight:700">
+            {delivery_label}
+          </p>
+          <p style="margin:4px 0 0;font-size:12px;color:{C_AMBER};font-weight:600">{fee_txt}</p>
+        </td>
+        <td style="width:8px;background:#fff"></td>
+        <td style="padding:12px 14px;background:{C_BG};border-radius:0 8px 8px 0;
+                   border:1px solid {C_BORDER};border-left:none;width:50%;vertical-align:top">
+          <p style="margin:0;font-size:10px;color:{C_MUTED};text-transform:uppercase;
+                    font-weight:700;letter-spacing:1px">Mode de paiement</p>
+          <p style="margin:6px 0 0;font-size:14px;color:{C_DARK};font-weight:700">
+            {pay_icon} {payment}
+          </p>
+        </td>
+      </tr>
+    </table>"""
+
+
+def _financial_summary(order_data: dict) -> str:
+    """Tableau récap financier complet."""
+    total      = order_data["total_amount"]
+    delivery   = order_data.get("delivery_fee") or 0
+    subtotal   = total - delivery
+    acompte    = order_data.get("acompte_amount")
+    reste      = (total - acompte) if acompte else None
+
+    rows_html = ""
+
+    # Sous-total articles
+    rows_html += f"""
+    <tr>
+      <td style="padding:8px 14px;font-size:13px;color:{C_MUTED}">Sous-total articles</td>
+      <td style="padding:8px 14px;font-size:13px;color:{C_TEXT};font-weight:600;text-align:right">
+        {subtotal:,.0f} FCFA
+      </td>
+    </tr>"""
+
+    # Frais de livraison
+    rows_html += f"""
+    <tr>
+      <td style="padding:8px 14px;font-size:13px;color:{C_MUTED}">Frais de livraison</td>
+      <td style="padding:8px 14px;font-size:13px;color:{C_TEXT};font-weight:600;text-align:right">
+        {"+" + f"{delivery:,.0f} FCFA" if delivery else "Gratuit"}
+      </td>
+    </tr>"""
+
+    # Séparateur + Total
+    rows_html += f"""
+    <tr style="background:{C_AMBER2}">
+      <td style="padding:12px 14px;font-size:15px;font-weight:800;color:{C_DARK}">
+        Total commande
+      </td>
+      <td style="padding:12px 14px;font-size:15px;font-weight:800;
+                 color:{C_AMBER};text-align:right">
+        {total:,.0f} FCFA
+      </td>
+    </tr>"""
+
+    # Acompte Wave (si applicable)
+    if acompte:
+        rows_html += f"""
+    <tr style="background:#f0fdf4">
+      <td style="padding:10px 14px;font-size:13px;color:#166534;font-weight:700">
+        ✅ Acompte Wave payé
+      </td>
+      <td style="padding:10px 14px;font-size:13px;color:#16a34a;font-weight:800;text-align:right">
+        -{acompte:,.0f} FCFA
+      </td>
+    </tr>
+    <tr style="background:#f0fdf4">
+      <td style="padding:0 14px 12px;font-size:12px;color:#166534" colspan="2">
+        👉 Reste à régler à la livraison :
+        <strong>{reste:,.0f} FCFA</strong>
+      </td>
+    </tr>"""
+
+    return f"""
+    <table style="width:100%;border-collapse:collapse;border-radius:10px;
+                  overflow:hidden;border:1px solid {C_BORDER};margin:16px 0">
+      <tbody>{rows_html}</tbody>
+    </table>"""
+
+
 # ── Email client ───────────────────────────────────────────────────────────────
 
 def _build_client_email(order_data: dict) -> str:
-    total_fmt = f"{order_data['total_amount']:,.0f}"
-    table     = _items_table(order_data["items"], total_fmt)
-
-    address_block = ""
-    if order_data.get("customer_address"):
-        address_block = _info_pill("Adresse de livraison", order_data["customer_address"])
-
-    phone_block = ""
-    if order_data.get("customer_phone"):
-        phone_block = _info_pill("Téléphone", order_data["customer_phone"])
+    table = _items_table(order_data["items"], f"{order_data['total_amount']:,.0f}")
 
     body = f"""
     {_header(f"Commande #{order_data['id']} confirmée ✓", "Merci pour votre achat !")}
 
     <div style="padding:28px 28px 8px">
 
-      <p style="margin:0 0 20px;font-size:15px;color:{C_TEXT}">
+      <p style="margin:0 0 6px;font-size:15px;color:{C_TEXT}">
         Bonjour <strong style="color:{C_DARK}">{order_data['customer_name']}</strong>,
       </p>
       <p style="margin:0 0 24px;font-size:14px;color:{C_MUTED};line-height:1.6">
-        Nous avons bien reçu votre commande. Notre équipe vous contactera
-        prochainement pour organiser la livraison.
+        Nous avons bien reçu votre commande. Voici le récapitulatif complet.
       </p>
 
+      {_section_title("Vos informations")}
+      {_info_table([
+          ("Nom",       order_data['customer_name'],                   False, ""),
+          ("Email",     order_data['customer_email'],                  False, ""),
+          ("Téléphone", order_data.get('customer_phone') or '—',       False, ""),
+          ("Adresse",   order_data.get('customer_address') or '—',     False, ""),
+      ])}
+
+      {_section_title("Vos choix")}
+      {_choices_section(order_data)}
+
+      {_section_title("Articles commandés")}
       {table}
 
-      <div style="margin:20px 0;line-height:2">
-        {_info_pill("Mode de paiement", order_data['payment_method'])}
-        {phone_block}
-        {address_block}
-      </div>
+      {_section_title("Résumé financier")}
+      {_financial_summary(order_data)}
 
       <div style="background:{C_AMBER2};border-left:4px solid {C_AMBER};
                   border-radius:0 8px 8px 0;padding:14px 18px;margin:24px 0">
-        <p style="margin:0;font-size:13px;color:{C_DARK};font-weight:600">
+        <p style="margin:0;font-size:13px;color:{C_DARK};font-weight:700">
           📦 Votre commande est en cours de traitement.
         </p>
         <p style="margin:6px 0 0;font-size:12px;color:{C_MUTED}">
-          Vous recevrez une notification dès qu'elle sera expédiée.
+          Notre équipe vous contactera prochainement pour organiser la livraison.
         </p>
       </div>
 
     </div>
-
     {_footer()}"""
 
     return _wrap(body)
@@ -194,43 +329,44 @@ def _build_client_email(order_data: dict) -> str:
 # ── Email admin ────────────────────────────────────────────────────────────────
 
 def _build_admin_email(order_data: dict) -> str:
-    total_fmt = f"{order_data['total_amount']:,.0f}"
-    table     = _items_table(order_data["items"], total_fmt)
+    table = _items_table(order_data["items"], f"{order_data['total_amount']:,.0f}")
 
     body = f"""
-    {_header(f"Nouvelle commande #{order_data['id']}", "Un client vient de passer commande")}
+    {_header(f"🛒 Nouvelle commande #{order_data['id']}", f"{order_data['customer_name']} — {order_data['total_amount']:,.0f} FCFA")}
 
     <div style="padding:28px 28px 8px">
 
-      <h2 style="margin:0 0 16px;font-size:15px;color:{C_DARK};font-weight:700;
-                 text-transform:uppercase;letter-spacing:0.5px">
-        Informations client
-      </h2>
+      {_section_title("Informations du client")}
+      {_info_table([
+          ("Nom complet", order_data['customer_name'],                   True,  C_DARK),
+          ("Email",       order_data['customer_email'],                  False, ""),
+          ("Téléphone",   order_data.get('customer_phone') or '—',       False, ""),
+          ("Adresse",     order_data.get('customer_address') or '—',     False, ""),
+          ("Date",        order_data.get('created_at', '—') if isinstance(order_data.get('created_at'), str)
+                          else (order_data['created_at'].strftime('%d/%m/%Y %H:%M') if order_data.get('created_at') else '—'),
+                          False, ""),
+      ])}
 
-      <div style="line-height:2">
-        {_info_pill("Nom", order_data['customer_name'])}
-        {_info_pill("Email", order_data['customer_email'])}
-        {_info_pill("Téléphone", order_data.get('customer_phone') or '—')}
-        {_info_pill("Adresse", order_data.get('customer_address') or '—')}
-        {_info_pill("Paiement", order_data['payment_method'])}
-      </div>
+      {_section_title("Choix du client")}
+      {_choices_section(order_data)}
 
-      <h2 style="margin:28px 0 4px;font-size:15px;color:{C_DARK};font-weight:700;
-                 text-transform:uppercase;letter-spacing:0.5px">
-        Détail de la commande
-      </h2>
-
+      {_section_title("Articles commandés")}
       {table}
 
+      {_section_title("Résumé financier")}
+      {_financial_summary(order_data)}
+
       <div style="background:{C_AMBER2};border-left:4px solid {C_AMBER};
-                  border-radius:0 8px 8px 0;padding:14px 18px;margin:8px 0 24px">
-        <p style="margin:0;font-size:13px;color:{C_DARK};font-weight:600">
-          ⚡ Action requise : traitez cette commande dans l'interface admin.
+                  border-radius:0 8px 8px 0;padding:16px 18px;margin:8px 0 28px">
+        <p style="margin:0;font-size:14px;color:{C_DARK};font-weight:800">
+          ⚡ Action requise
+        </p>
+        <p style="margin:6px 0 0;font-size:13px;color:{C_TEXT}">
+          Connectez-vous à l'interface admin pour valider ou rejeter cette commande.
         </p>
       </div>
 
     </div>
-
     {_footer()}"""
 
     return _wrap(body)

@@ -46,6 +46,10 @@ class Order(Base):
     status = Column(String, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    delivery_method = Column(String, nullable=True)   # domicile | retrait | personnel
+    delivery_fee    = Column(Float,  default=0)
+    acompte_amount  = Column(Float,  nullable=True)   # montant de l'acompte Wave si applicable
+
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 

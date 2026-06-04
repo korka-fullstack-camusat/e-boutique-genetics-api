@@ -75,6 +75,9 @@ class OrderCreate(BaseModel):
     customer_address: Optional[str] = None
     payment_method: str
     total_amount: float
+    delivery_method: Optional[str] = None
+    delivery_fee: float = 0
+    acompte_amount: Optional[float] = None
     items: List[OrderItemCreate]
 
 
@@ -90,6 +93,9 @@ class OrderResponse(BaseModel):
     customer_address: Optional[str]
     payment_method: str
     total_amount: float
+    delivery_method: Optional[str] = None
+    delivery_fee: float = 0
+    acompte_amount: Optional[float] = None
     status: str
     created_at: datetime
     items: List[OrderItemResponse] = []
