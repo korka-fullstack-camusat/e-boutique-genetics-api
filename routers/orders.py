@@ -31,26 +31,29 @@ async def create_order(
 ):
     """Create a new order and send email notification"""
     order = Order(
-        customer_name=order_data.customer_name,
-        customer_email=order_data.customer_email,
-        customer_phone=order_data.customer_phone,
-        customer_address=order_data.customer_address,
-        payment_method=order_data.payment_method,
-        total_amount=order_data.total_amount,
-        status="pending",
+        customer_name    = order_data.customer_name,
+        customer_email   = order_data.customer_email,
+        customer_phone   = order_data.customer_phone,
+        customer_address = order_data.customer_address,
+        payment_method   = order_data.payment_method,
+        total_amount     = order_data.total_amount,
+        delivery_method  = order_data.delivery_method,
+        delivery_fee     = order_data.delivery_fee or 0,
+        acompte_amount   = order_data.acompte_amount,
+        status           = "pending",
     )
     db.add(order)
     await db.flush()  # get order.id before committing
 
     items = [
         OrderItem(
-            order_id=order.id,
-            product_id=i.product_id,
-            product_name=i.product_name,
-            quantity=i.quantity,
-            price=i.price,
-            size=i.size,
-            color=i.color,
+            order_id     = order.id,
+            product_id   = i.product_id,
+            product_name = i.product_name,
+            quantity     = i.quantity,
+            price        = i.price,
+            size         = i.size,
+            color        = i.color,
         )
         for i in order_data.items
     ]
@@ -59,20 +62,24 @@ async def create_order(
 
     # Serialize to plain dict before session closes — avoids DetachedInstanceError
     email_data = {
-        "id": order.id,
-        "customer_name": order.customer_name,
-        "customer_email": order.customer_email,
-        "customer_phone": order.customer_phone,
+        "id":               order.id,
+        "customer_name":    order.customer_name,
+        "customer_email":   order.customer_email,
+        "customer_phone":   order.customer_phone,
         "customer_address": order.customer_address,
-        "payment_method": order.payment_method,
-        "total_amount": order.total_amount,
+        "payment_method":   order.payment_method,
+        "total_amount":     order.total_amount,
+        "delivery_method":  order.delivery_method,
+        "delivery_fee":     order.delivery_fee,
+        "acompte_amount":   order.acompte_amount,
+        "created_at":       order.created_at,
         "items": [
             {
                 "product_name": i.product_name,
-                "quantity": i.quantity,
-                "price": i.price,
-                "size": i.size,
-                "color": i.color,
+                "quantity":     i.quantity,
+                "price":        i.price,
+                "size":         i.size,
+                "color":        i.color,
             }
             for i in items
         ],

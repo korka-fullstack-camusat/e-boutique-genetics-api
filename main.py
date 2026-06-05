@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlalchemy import text
 
 from database import engine, Base
 from routers import products, orders, auth, upload, survey
@@ -11,9 +12,17 @@ from routers import admin_users  # noqa: F401 — imported for side-effect (mode
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create any missing tables on startup (safe — skips existing ones)
     async with engine.begin() as conn:
+        # Crée les tables manquantes (sans toucher aux existantes)
         await conn.run_sync(Base.metadata.create_all)
+
+        # Ajoute les nouvelles colonnes orders si elles n'existent pas encore
+        await conn.execute(text("""
+            ALTER TABLE orders
+                ADD COLUMN IF NOT EXISTS delivery_method VARCHAR,
+                ADD COLUMN IF NOT EXISTS delivery_fee     FLOAT   DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS acompte_amount   FLOAT
+        """))
     yield
 
 
