@@ -6,7 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 
 from database import engine, Base
-from routers import products, orders, auth, upload, survey
+from routers import products, orders, auth, upload, survey, contact
 from routers import admin_users  # noqa: F401 — imported for side-effect (model registration)
 
 
@@ -50,6 +50,7 @@ app.include_router(auth.router,        prefix="/api/auth",         tags=["auth"]
 app.include_router(upload.router,      prefix="/api/upload",       tags=["upload"])
 app.include_router(survey.router,      prefix="/api/survey",       tags=["survey"])
 app.include_router(admin_users.router, prefix="/api/admin-users",  tags=["admin-users"])
+app.include_router(contact.router,     prefix="/api/contact",       tags=["contact"])
 
 
 @app.get("/")

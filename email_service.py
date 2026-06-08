@@ -403,3 +403,95 @@ async def send_order_confirmation(order_data: dict) -> None:
         for r in results:
             if isinstance(r, Exception):
                 logger.error("Erreur envoi email : %s", r)
+
+
+# ── Devis ──────────────────────────────────────────────────────────────────────
+
+def _build_devis_admin_email(d: dict) -> str:
+    body = f"""
+    {_header("📋 Nouvelle demande de devis", "Un client souhaite un devis")}
+    <div style="padding:24px;background:#ffffff">
+
+      {_section_title("Informations du demandeur")}
+      <div style="text-align:center;padding:8px 0">
+        {_info_pill("Nom", d["name"])}
+        {_info_pill("Email", d["email"])}
+        {_info_pill("Téléphone", d.get("phone") or "—")}
+        {_info_pill("Service demandé", d["service"])}
+      </div>
+
+      {_section_title("Description du besoin")}
+      <div style="background:{C_BG};border:1px solid {C_BORDER};border-radius:10px;
+                  padding:18px 20px;margin:16px 0">
+        <p style="margin:0;font-size:14px;color:{C_TEXT};line-height:1.7;white-space:pre-wrap">{d["description"]}</p>
+      </div>
+
+      <div style="text-align:center;margin:24px 0 8px">
+        <a href="mailto:{d['email']}"
+           style="display:inline-block;background:{C_AMBER};color:{C_DARK};
+                  padding:12px 32px;border-radius:30px;font-weight:700;
+                  font-size:14px;text-decoration:none">
+          Répondre au client
+        </a>
+      </div>
+    </div>
+    {_footer()}"""
+    return _wrap(body)
+
+
+def _build_devis_client_email(d: dict) -> str:
+    body = f"""
+    {_header("✅ Demande de devis reçue", "Nous reviendrons vers vous très prochainement")}
+    <div style="padding:24px;background:#ffffff">
+      <p style="color:{C_TEXT};font-size:15px;margin:0 0 16px">
+        Bonjour <strong>{d["name"]}</strong>,
+      </p>
+      <p style="color:{C_TEXT};font-size:14px;line-height:1.7;margin:0 0 16px">
+        Nous avons bien reçu votre demande de devis pour le service
+        <strong style="color:{C_AMBER}">{d["service"]}</strong>.
+        Notre équipe l'analysera dans les meilleurs délais et vous contactera à l'adresse
+        <strong>{d["email"]}</strong>{f" ou au <strong>{d['phone']}</strong>" if d.get("phone") else ""}.
+      </p>
+
+      {_section_title("Récapitulatif de votre demande")}
+      <div style="background:{C_BG};border:1px solid {C_BORDER};border-radius:10px;
+                  padding:18px 20px;margin:16px 0">
+        <p style="margin:0;font-size:14px;color:{C_TEXT};line-height:1.7;white-space:pre-wrap">{d["description"]}</p>
+      </div>
+
+      <p style="color:{C_MUTED};font-size:13px;margin:20px 0 0">
+        Pour toute question urgente, vous pouvez nous joindre directement à
+        <a href="mailto:market@groupegenetics.com" style="color:{C_AMBER}">market@groupegenetics.com</a>.
+      </p>
+    </div>
+    {_footer()}"""
+    return _wrap(body)
+
+
+async def send_devis_notification(devis_data: dict) -> None:
+    logger.info("Envoi emails devis — demandeur: %s | notif: %s",
+                devis_data["email"], ORDERS_EMAIL)
+
+    admin_html  = _build_devis_admin_email(devis_data)
+    client_html = _build_devis_client_email(devis_data)
+
+    async with httpx.AsyncClient() as client:
+        tasks = [
+            _send(client,
+                  devis_data["email"],
+                  devis_data["name"],
+                  "✅ Votre demande de devis — Groupe Genetics",
+                  client_html),
+        ]
+        if ORDERS_EMAIL:
+            tasks.append(
+                _send(client,
+                      ORDERS_EMAIL,
+                      "Groupe Genetics — Devis",
+                      f"📋 Devis — {devis_data['name']} ({devis_data['service']})",
+                      admin_html)
+            )
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error("Erreur envoi email devis : %s", r)

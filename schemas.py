@@ -142,6 +142,16 @@ class AdminUserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Devis ─────────────────────────────────────────────────────────────────────
+
+class DevisCreate(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    service: str
+    description: str
+
+
 # ── Survey ────────────────────────────────────────────────────────────────────
 
 class SurveyCreate(BaseModel):
