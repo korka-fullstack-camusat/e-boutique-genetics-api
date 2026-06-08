@@ -12,6 +12,8 @@ BREVO_API_KEY  = os.getenv("BREVO_API_KEY", "")
 SENDER_EMAIL   = os.getenv("BREVO_SENDER_EMAIL", "")
 SENDER_NAME    = os.getenv("BREVO_SENDER_NAME", "E-commerce")
 ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL", "")
+# Adresse qui doit recevoir les notifications de nouvelles commandes
+ORDERS_EMAIL   = os.getenv("ORDERS_NOTIFICATION_EMAIL", "market@groupegenetics.com")
 _BREVO_URL     = "https://api.brevo.com/v3/smtp/email"
 
 # ── Palette (matches the frontend) ────────────────────────────────────────────
@@ -375,8 +377,8 @@ def _build_admin_email(order_data: dict) -> str:
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 async def send_order_confirmation(order_data: dict) -> None:
-    logger.info("Envoi emails commande #%s → %s | admin: %s",
-                order_data["id"], order_data["customer_email"], ADMIN_EMAIL)
+    logger.info("Envoi emails commande #%s → %s | notif commande: %s",
+                order_data["id"], order_data["customer_email"], ORDERS_EMAIL)
 
     client_html = _build_client_email(order_data)
     admin_html  = _build_admin_email(order_data)
@@ -389,11 +391,11 @@ async def send_order_confirmation(order_data: dict) -> None:
                   f"✅ Commande #{order_data['id']} confirmée — Groupe Genetics",
                   client_html),
         ]
-        if ADMIN_EMAIL:
+        if ORDERS_EMAIL:
             tasks.append(
                 _send(client,
-                      ADMIN_EMAIL,
-                      "Admin Groupe Genetics",
+                      ORDERS_EMAIL,
+                      "Groupe Genetics — Commandes",
                       f"🛒 Nouvelle commande #{order_data['id']} — {order_data['customer_name']} ({order_data['total_amount']:,.0f} FCFA)",
                       admin_html)
             )
