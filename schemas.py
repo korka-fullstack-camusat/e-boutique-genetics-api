@@ -15,6 +15,7 @@ class ProductCreate(BaseModel):
     images: Optional[List[str]] = []
     sizes: Optional[List[str]] = []
     colors: Optional[List[str]] = []
+    condition: Optional[str] = "neuf"
 
 
 class ProductUpdate(BaseModel):
@@ -27,6 +28,7 @@ class ProductUpdate(BaseModel):
     images: Optional[List[str]] = None
     sizes: Optional[List[str]] = None
     colors: Optional[List[str]] = None
+    condition: Optional[str] = None
 
 
 class ProductResponse(BaseModel):
@@ -39,6 +41,7 @@ class ProductResponse(BaseModel):
     images: Optional[List[str]] = []
     sizes: Optional[List[str]] = []
     colors: Optional[List[str]] = []
+    condition: Optional[str] = "neuf"
     id: int
     created_at: datetime
 

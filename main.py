@@ -23,6 +23,12 @@ async def lifespan(app: FastAPI):
                 ADD COLUMN IF NOT EXISTS delivery_fee     FLOAT   DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS acompte_amount   FLOAT
         """))
+
+        # Ajoute la colonne condition (neuf | reconditionne) si elle n'existe pas encore
+        await conn.execute(text("""
+            ALTER TABLE products
+                ADD COLUMN IF NOT EXISTS condition VARCHAR DEFAULT 'neuf'
+        """))
     yield
 
 

@@ -25,6 +25,7 @@ class Product(Base):
     images = Column(JSON, default=list)
     sizes = Column(JSON, default=list)
     colors = Column(JSON, default=list)
+    condition = Column(String, default="neuf")  # "neuf" | "reconditionne"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
