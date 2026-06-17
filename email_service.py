@@ -638,10 +638,6 @@ async def send_invoice_email(order_data: dict) -> None:
         relative à votre commande #{order_data['id']}.
       </p>
       {financial_line}
-      <p style="margin:20px 0 28px;font-size:13px;color:{C_MUTED}">
-        Pour toute question, contactez-nous à
-        <a href="mailto:admin@groupegenetics.com" style="color:{C_AMBER}">admin@groupegenetics.com</a>.
-      </p>
     </div>
     {_footer()}"""
 
