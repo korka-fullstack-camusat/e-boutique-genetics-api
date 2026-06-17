@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 import httpx
+from datetime import datetime
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -466,6 +467,148 @@ def _build_devis_client_email(d: dict) -> str:
     </div>
     {_footer()}"""
     return _wrap(body)
+
+
+def _invoice_num(order_data: dict) -> str:
+    created = order_data.get("created_at")
+    if hasattr(created, "year"):
+        year = created.year
+    elif isinstance(created, str):
+        try:
+            year = datetime.fromisoformat(created).year
+        except Exception:
+            year = datetime.now().year
+    else:
+        year = datetime.now().year
+    num = str(order_data["id"]).zfill(3)
+    acompte = order_data.get("acompte_amount") or 0
+    return f"AC-{year}-{num}" if acompte > 0 else f"FA-{year}-{num}"
+
+
+def _build_invoice_email(order_data: dict) -> str:
+    invoice_num = _invoice_num(order_data)
+    is_acompte  = (order_data.get("acompte_amount") or 0) > 0
+    acompte     = order_data.get("acompte_amount") or 0
+    total       = order_data["total_amount"]
+    solde       = total - acompte
+
+    invoice_type = "Facture d'Acompte" if is_acompte else "Facture"
+
+    created = order_data.get("created_at")
+    if hasattr(created, "strftime"):
+        date_str = created.strftime("%d/%m/%Y")
+    elif isinstance(created, str):
+        try:
+            date_str = datetime.fromisoformat(created).strftime("%d/%m/%Y")
+        except Exception:
+            date_str = created[:10]
+    else:
+        date_str = datetime.now().strftime("%d/%m/%Y")
+
+    badge_bg    = "#fff7ed" if is_acompte else "#f0fdf4"
+    badge_bord  = "#f97316" if is_acompte else "#16a34a"
+    badge_color = "#ea580c" if is_acompte else "#15803d"
+    badge_label = "ACOMPTE" if is_acompte else "SOLDÉ"
+
+    # Lignes articles
+    items_html = ""
+    for item in order_data["items"]:
+        subtotal = item["price"] * item["quantity"]
+        items_html += f"""
+        <tr>
+          <td style="padding:10px 12px;font-size:13px;color:{C_TEXT};border-bottom:1px solid {C_BORDER}">{item['product_name']}</td>
+          <td style="padding:10px 12px;text-align:center;font-size:13px;color:{C_MUTED};border-bottom:1px solid {C_BORDER}">{item['quantity']}</td>
+          <td style="padding:10px 12px;text-align:right;font-size:13px;color:{C_MUTED};border-bottom:1px solid {C_BORDER}">{item['price']:,.0f}</td>
+          <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:700;color:{C_DARK};border-bottom:1px solid {C_BORDER}">{subtotal:,.0f} FCFA</td>
+        </tr>"""
+
+    # Lignes financières
+    if is_acompte:
+        fin_html = f"""
+        <tr style="background:{C_AMBER2}">
+          <td colspan="3" style="padding:11px 12px;font-weight:800;font-size:14px;color:{C_DARK}">Total commande</td>
+          <td style="padding:11px 12px;text-align:right;font-weight:800;font-size:14px;color:{C_AMBER}">{total:,.0f} FCFA</td>
+        </tr>
+        <tr style="background:#f0f0ff">
+          <td colspan="3" style="padding:10px 12px;font-weight:700;font-size:13px;color:#5b21b6">Acompte reçu (Wave)</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:13px;color:#5b21b6">−{acompte:,.0f} FCFA</td>
+        </tr>
+        <tr style="background:#fff7ed">
+          <td colspan="3" style="padding:13px 12px;font-weight:900;font-size:15px;color:#ea580c">SOLDE RESTANT DÛ</td>
+          <td style="padding:13px 12px;text-align:right;font-weight:900;font-size:16px;color:#ea580c">{solde:,.0f} FCFA</td>
+        </tr>"""
+    else:
+        fin_html = f"""
+        <tr style="background:{C_AMBER2}">
+          <td colspan="3" style="padding:13px 12px;font-weight:900;font-size:15px;color:{C_DARK}">Total réglé</td>
+          <td style="padding:13px 12px;text-align:right;font-weight:900;font-size:16px;color:{C_AMBER}">{total:,.0f} FCFA</td>
+        </tr>"""
+
+    body = f"""
+    {_header(f"{invoice_type} {invoice_num}", f"Commande #{order_data['id']} — {order_data['customer_name']}")}
+
+    <div style="padding:28px 28px 8px">
+
+      <div style="margin-bottom:16px">
+        <span style="display:inline-block;background:{badge_bg};border:2px solid {badge_bord};
+                     color:{badge_color};font-weight:900;font-size:12px;padding:4px 16px;
+                     border-radius:20px;letter-spacing:1px">
+          {badge_label}
+        </span>
+      </div>
+
+      {_section_title("Informations de facturation")}
+      {_info_table([
+          ("N° Facture",       invoice_num,                                        True,  C_DARK),
+          ("Date",             date_str,                                            False, ""),
+          ("Client",           order_data["customer_name"],                         True,  C_DARK),
+          ("Email",            order_data["customer_email"],                        False, ""),
+          ("Téléphone",        order_data.get("customer_phone") or "—",             False, ""),
+          ("Mode de paiement", order_data.get("payment_method") or "—",             False, ""),
+      ])}
+
+      {_section_title("Articles commandés")}
+      <table style="width:100%;border-collapse:collapse;border:1px solid {C_BORDER};border-radius:10px;overflow:hidden;margin:16px 0">
+        <thead>
+          <tr style="background:{C_DARK}">
+            <th style="padding:11px 12px;text-align:left;color:rgba(255,255,255,0.7);font-size:11px;text-transform:uppercase;letter-spacing:1px">Description</th>
+            <th style="padding:11px 12px;text-align:center;color:rgba(255,255,255,0.7);font-size:11px;text-transform:uppercase;letter-spacing:1px">Qté</th>
+            <th style="padding:11px 12px;text-align:right;color:rgba(255,255,255,0.7);font-size:11px;text-transform:uppercase;letter-spacing:1px">P.U.</th>
+            <th style="padding:11px 12px;text-align:right;color:rgba(255,255,255,0.7);font-size:11px;text-transform:uppercase;letter-spacing:1px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items_html}
+          {fin_html}
+        </tbody>
+      </table>
+
+      {_section_title("Émis par")}
+      <div style="background:{C_BG};border:1px solid {C_BORDER};border-radius:10px;padding:16px 20px;margin:16px 0 28px">
+        <p style="margin:0;font-size:13px;font-weight:800;color:{C_DARK}">GLOBAL ENERGIES AND IT</p>
+        <p style="margin:4px 0 0;font-size:12px;color:{C_MUTED}">ZAC MBAO, ROND-POINT SIPRES</p>
+        <p style="margin:2px 0 0;font-size:12px;color:{C_MUTED}">RC : SN.DKR.2025.B.22955 — NINEA : 012204559</p>
+        <p style="margin:2px 0 0;font-size:12px;color:{C_MUTED}">Tél : +221 78 879 00 00</p>
+      </div>
+
+    </div>
+    {_footer()}"""
+
+    return _wrap(body)
+
+
+async def send_invoice_email(order_data: dict) -> None:
+    inv_num = _invoice_num(order_data)
+    logger.info("Envoi facture %s → %s", inv_num, order_data["customer_email"])
+    html = _build_invoice_email(order_data)
+    async with httpx.AsyncClient() as client:
+        await _send(
+            client,
+            order_data["customer_email"],
+            order_data["customer_name"],
+            f"📄 Votre facture {inv_num} — Groupe Genetics",
+            html,
+        )
 
 
 async def send_devis_notification(devis_data: dict) -> None:

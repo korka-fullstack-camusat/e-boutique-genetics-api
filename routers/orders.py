@@ -7,7 +7,7 @@ from typing import List
 from database import get_db
 from models import Order, OrderItem, Product
 from schemas import OrderCreate, OrderUpdate, OrderResponse
-from email_service import send_order_confirmation
+from email_service import send_order_confirmation, send_invoice_email
 
 router = APIRouter()
 
@@ -107,6 +107,41 @@ async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
+
+
+@router.post("/{order_id}/send-invoice")
+async def send_order_invoice(
+    order_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the invoice for a confirmed order to the customer by email"""
+    result = await db.execute(
+        select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    if order.status != "confirmed":
+        raise HTTPException(status_code=400, detail="La commande n'est pas confirmée")
+
+    invoice_data = {
+        "id":               order.id,
+        "customer_name":    order.customer_name,
+        "customer_email":   order.customer_email,
+        "customer_phone":   order.customer_phone,
+        "customer_address": order.customer_address,
+        "payment_method":   order.payment_method,
+        "total_amount":     order.total_amount,
+        "acompte_amount":   order.acompte_amount,
+        "created_at":       order.created_at,
+        "items": [
+            {"product_name": i.product_name, "quantity": i.quantity, "price": i.price}
+            for i in order.items
+        ],
+    }
+    background_tasks.add_task(send_invoice_email, invoice_data)
+    return {"message": "Facture envoyée avec succès"}
 
 
 @router.patch("/{order_id}", response_model=OrderResponse)
