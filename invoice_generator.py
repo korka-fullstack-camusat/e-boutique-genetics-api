@@ -19,6 +19,23 @@ def _fmt_num(value: float) -> str:
     return f"{value:,.0f}".replace(",", " ")
 
 
+def _txt(s) -> str:
+    """Sanitize text for Helvetica (Latin-1). Replaces common Unicode chars first."""
+    return (
+        str(s)
+        .replace("—", "-")   # em dash —
+        .replace("–", "-")   # en dash –
+        .replace("’", "'")   # right single quote '
+        .replace("‘", "'")   # left single quote '
+        .replace("“", '"')   # left double quote "
+        .replace("”", '"')   # right double quote "
+        .replace("…", "...")  # ellipsis …
+        .replace("×", "x")   # multiplication sign ×
+        .encode("latin-1", errors="replace")
+        .decode("latin-1")
+    )
+
+
 def _invoice_num_from(order_data: dict) -> str:
     created = order_data.get("created_at")
     if hasattr(created, "year"):
@@ -99,20 +116,21 @@ def generate_invoice_pdf(order_data: dict) -> bytes:
     def value(txt: str, ln: bool = False) -> None:
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(*C_DARK)
+        safe = _txt(txt)
         if ln:
-            pdf.cell(col, 6, txt, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(col, 6, safe, new_x="LMARGIN", new_y="NEXT")
         else:
-            pdf.cell(col, 6, txt)
+            pdf.cell(col, 6, safe)
 
     label("Date"); label("Client"); pdf.ln()
-    value(date_str); value(order_data["customer_name"], ln=True)
+    value(date_str); value(_txt(order_data["customer_name"]), ln=True)
 
     label("Reference"); label("Email"); pdf.ln()
-    value(inv_num); value(order_data.get("customer_email") or "-", ln=True)
+    value(inv_num); value(_txt(order_data.get("customer_email") or "-"), ln=True)
 
     label("Mode de paiement"); label("Telephone"); pdf.ln()
-    value(order_data.get("payment_method") or "-")
-    value(order_data.get("customer_phone") or "-", ln=True)
+    value(_txt(order_data.get("payment_method") or "-"))
+    value(_txt(order_data.get("customer_phone") or "-"), ln=True)
 
     pdf.ln(6)
 
@@ -138,7 +156,7 @@ def generate_invoice_pdf(order_data: dict) -> bytes:
         pdf.set_fill_color(249, 250, 251) if alt else pdf.set_fill_color(255, 255, 255)
         pdf.set_text_color(*C_DARK)
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(col_w[0], 8, str(item["product_name"]), border="B", fill=alt, align="L")
+        pdf.cell(col_w[0], 8, _txt(item["product_name"]), border="B", fill=alt, align="L")
         pdf.cell(col_w[1], 8, str(item["quantity"]),        border="B", fill=alt, align="C")
         pdf.cell(col_w[2], 8, f"{_fmt_num(item['price'])} F", border="B", fill=alt, align="R")
         pdf.cell(col_w[3], 8, f"{_fmt_num(subtotal)} F",       border="B", fill=alt, align="R")
