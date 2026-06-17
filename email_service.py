@@ -28,17 +28,21 @@ C_BG     = "#f9fafb"   # gray-50
 
 
 async def _send(client: httpx.AsyncClient, to_email: str, to_name: str,
-                subject: str, html: str) -> None:
+                subject: str, html: str,
+                attachments: list | None = None) -> None:
+    payload: dict = {
+        "sender":      {"name": SENDER_NAME, "email": SENDER_EMAIL},
+        "to":          [{"email": to_email, "name": to_name}],
+        "subject":     subject,
+        "htmlContent": html,
+    }
+    if attachments:
+        payload["attachment"] = attachments
     response = await client.post(
         _BREVO_URL,
-        json={
-            "sender": {"name": SENDER_NAME, "email": SENDER_EMAIL},
-            "to": [{"email": to_email, "name": to_name}],
-            "subject": subject,
-            "htmlContent": html,
-        },
+        json=payload,
         headers={"api-key": BREVO_API_KEY},
-        timeout=10,
+        timeout=30,
     )
     if response.status_code not in (200, 201):
         logger.error("Brevo %s → %s : %s", response.status_code, to_email, response.text)
@@ -598,16 +602,61 @@ def _build_invoice_email(order_data: dict) -> str:
 
 
 async def send_invoice_email(order_data: dict) -> None:
-    inv_num = _invoice_num(order_data)
-    logger.info("Envoi facture %s → %s", inv_num, order_data["customer_email"])
-    html = _build_invoice_email(order_data)
+    from invoice_generator import generate_invoice_pdf
+    import base64
+
+    inv_num    = _invoice_num(order_data)
+    is_acompte = (order_data.get("acompte_amount") or 0) > 0
+    acompte    = order_data.get("acompte_amount") or 0
+    total      = order_data["total_amount"]
+    solde      = total - acompte
+
+    logger.info("Génération PDF facture %s → %s", inv_num, order_data["customer_email"])
+    pdf_bytes  = generate_invoice_pdf(order_data)
+    pdf_b64    = base64.b64encode(pdf_bytes).decode("utf-8")
+
+    # Message court
+    if is_acompte:
+        financial_line = f"""
+        <p style="margin:12px 0;font-size:15px;color:{C_TEXT}">
+          Acompte reçu : <strong style="color:{C_AMBER}">{acompte:,.0f} FCFA</strong><br/>
+          Solde restant dû : <strong style="color:#ea580c">{solde:,.0f} FCFA</strong>
+        </p>"""
+    else:
+        financial_line = f"""
+        <p style="margin:12px 0;font-size:15px;color:{C_TEXT}">
+          Total réglé : <strong style="color:{C_AMBER}">{total:,.0f} FCFA</strong>
+        </p>"""
+
+    body = f"""
+    {_header(f"Votre facture {inv_num}", "Groupe Genetics — Facture")}
+    <div style="padding:28px 28px 8px">
+      <p style="margin:0 0 8px;font-size:15px;color:{C_TEXT}">
+        Bonjour <strong style="color:{C_DARK}">{order_data['customer_name']}</strong>,
+      </p>
+      <p style="margin:0 0 16px;font-size:14px;color:{C_MUTED}">
+        Veuillez trouver ci-joint votre facture <strong>{inv_num}</strong>
+        relative à votre commande #{order_data['id']}.
+      </p>
+      {financial_line}
+      <p style="margin:20px 0 28px;font-size:13px;color:{C_MUTED}">
+        Pour toute question, contactez-nous à
+        <a href="mailto:admin@groupegenetics.com" style="color:{C_AMBER}">admin@groupegenetics.com</a>.
+      </p>
+    </div>
+    {_footer()}"""
+
+    html = _wrap(body)
+    attachment = [{"content": pdf_b64, "name": f"{inv_num}.pdf"}]
+
     async with httpx.AsyncClient() as client:
         await _send(
             client,
             order_data["customer_email"],
             order_data["customer_name"],
-            f"📄 Votre facture {inv_num} — Groupe Genetics",
+            f"Votre facture {inv_num} — Groupe Genetics",
             html,
+            attachments=attachment,
         )
 
 
