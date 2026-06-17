@@ -1,9 +1,11 @@
 import os
+import base64
 import asyncio
 import logging
 import httpx
 from datetime import datetime
 from dotenv import load_dotenv
+from invoice_generator import generate_invoice_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -602,9 +604,6 @@ def _build_invoice_email(order_data: dict) -> str:
 
 
 async def send_invoice_email(order_data: dict) -> None:
-    from invoice_generator import generate_invoice_pdf
-    import base64
-
     inv_num    = _invoice_num(order_data)
     is_acompte = (order_data.get("acompte_amount") or 0) > 0
     acompte    = order_data.get("acompte_amount") or 0

@@ -112,10 +112,9 @@ async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/{order_id}/send-invoice")
 async def send_order_invoice(
     order_id: int,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    """Send the invoice for a confirmed order to the customer by email"""
+    """Send the invoice PDF for a confirmed order to the customer by email"""
     result = await db.execute(
         select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
     )
@@ -140,7 +139,10 @@ async def send_order_invoice(
             for i in order.items
         ],
     }
-    background_tasks.add_task(send_invoice_email, invoice_data)
+    try:
+        await send_invoice_email(invoice_data)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erreur envoi facture : {exc}")
     return {"message": "Facture envoyée avec succès"}
 
 
