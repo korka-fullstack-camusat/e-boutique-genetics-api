@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import List
 
 from database import get_db
-from models import Order, OrderItem
+from models import Order, OrderItem, Product
 from schemas import OrderCreate, OrderUpdate, OrderResponse
 from email_service import send_order_confirmation
 
@@ -58,6 +58,14 @@ async def create_order(
         for i in order_data.items
     ]
     db.add_all(items)
+
+    # Décrémenter le stock de chaque produit commandé
+    for i in order_data.items:
+        prod_result = await db.execute(select(Product).where(Product.id == i.product_id))
+        product = prod_result.scalar_one_or_none()
+        if product:
+            product.stock = max(0, product.stock - i.quantity)
+
     await db.commit()
 
     # Serialize to plain dict before session closes — avoids DetachedInstanceError
