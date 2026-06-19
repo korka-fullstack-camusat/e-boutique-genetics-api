@@ -25,8 +25,11 @@ class Product(Base):
     images = Column(JSON, default=list)
     sizes = Column(JSON, default=list)
     colors = Column(JSON, default=list)
-    condition = Column(String, default="neuf")  # "neuf" | "reconditionne"
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    condition      = Column(String, default="neuf")  # "neuf" | "reconditionne"
+    reference      = Column(String, nullable=True)
+    marque         = Column(String, nullable=True)
+    disponibilite  = Column(String, nullable=True)   # "24h" | "48h" | "72h"
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Order(Base):

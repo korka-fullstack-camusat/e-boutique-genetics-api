@@ -16,6 +16,9 @@ class ProductCreate(BaseModel):
     sizes: Optional[List[str]] = []
     colors: Optional[List[str]] = []
     condition: Optional[str] = "neuf"
+    reference: Optional[str] = None
+    marque: Optional[str] = None
+    disponibilite: Optional[str] = None
 
 
 class ProductUpdate(BaseModel):
@@ -29,6 +32,9 @@ class ProductUpdate(BaseModel):
     sizes: Optional[List[str]] = None
     colors: Optional[List[str]] = None
     condition: Optional[str] = None
+    reference: Optional[str] = None
+    marque: Optional[str] = None
+    disponibilite: Optional[str] = None
 
 
 class ProductResponse(BaseModel):
@@ -42,6 +48,9 @@ class ProductResponse(BaseModel):
     sizes: Optional[List[str]] = []
     colors: Optional[List[str]] = []
     condition: Optional[str] = "neuf"
+    reference: Optional[str] = None
+    marque: Optional[str] = None
+    disponibilite: Optional[str] = None
     id: int
     created_at: datetime
 
