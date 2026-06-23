@@ -47,7 +47,7 @@ def _invoice_num_from(order_data: dict) -> str:
             year = datetime.now().year
     else:
         year = datetime.now().year
-    num = str(order_data["id"]).zfill(3)
+    num = str(order_data.get("invoice_number") or order_data["id"]).zfill(2)
     acompte = order_data.get("acompte_amount") or 0
     return f"AC-{year}-{num}" if acompte > 0 else f"FA-{year}-{num}"
 

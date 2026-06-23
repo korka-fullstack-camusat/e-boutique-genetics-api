@@ -53,6 +53,7 @@ class Order(Base):
     delivery_method = Column(String, nullable=True)   # domicile | retrait | personnel
     delivery_fee    = Column(Float,  default=0)
     acompte_amount  = Column(Float,  nullable=True)   # montant de l'acompte Wave si applicable
+    invoice_number  = Column(Integer, nullable=True, unique=True)  # numéro séquentiel de facture (01, 02, ...)
 
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 

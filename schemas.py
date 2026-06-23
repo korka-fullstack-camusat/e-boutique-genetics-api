@@ -108,6 +108,7 @@ class OrderResponse(BaseModel):
     delivery_method: Optional[str] = None
     delivery_fee: float = 0
     acompte_amount: Optional[float] = None
+    invoice_number: Optional[int] = None
     status: str
     created_at: datetime
     items: List[OrderItemResponse] = []

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List
 
@@ -30,6 +30,8 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new order and send email notification"""
+    max_invoice_number = (await db.execute(select(func.max(Order.invoice_number)))).scalar() or 0
+
     order = Order(
         customer_name    = order_data.customer_name,
         customer_email   = order_data.customer_email,
@@ -40,6 +42,7 @@ async def create_order(
         delivery_method  = order_data.delivery_method,
         delivery_fee     = order_data.delivery_fee or 0,
         acompte_amount   = order_data.acompte_amount,
+        invoice_number   = max_invoice_number + 1,
         status           = "pending",
     )
     db.add(order)
@@ -80,6 +83,7 @@ async def create_order(
         "delivery_method":  order.delivery_method,
         "delivery_fee":     order.delivery_fee,
         "acompte_amount":   order.acompte_amount,
+        "invoice_number":   order.invoice_number,
         "created_at":       order.created_at,
         "items": [
             {
@@ -94,7 +98,7 @@ async def create_order(
     }
     background_tasks.add_task(send_order_confirmation, email_data)
 
-    return {"message": "Order created successfully", "order_id": order.id}
+    return {"message": "Order created successfully", "order_id": order.id, "invoice_number": order.invoice_number}
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
@@ -133,6 +137,7 @@ async def send_order_invoice(
         "payment_method":   order.payment_method,
         "total_amount":     order.total_amount,
         "acompte_amount":   order.acompte_amount,
+        "invoice_number":   order.invoice_number,
         "created_at":       order.created_at,
         "items": [
             {"product_name": i.product_name, "quantity": i.quantity, "price": i.price}
