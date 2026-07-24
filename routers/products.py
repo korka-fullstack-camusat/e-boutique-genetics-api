@@ -31,7 +31,11 @@ async def get_products(
         stmt = stmt.where(Product.name.ilike(f"%{search}%"))
     stmt = stmt.order_by(Product.created_at.desc())
     result = await db.execute(stmt)
-    return result.scalars().all()
+    products = result.scalars().all()
+    for p in products:
+        if p.images and len(p.images) > 1:
+            p.images = p.images[:1]
+    return products
 
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
