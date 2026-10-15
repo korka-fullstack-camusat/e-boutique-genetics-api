@@ -10,3 +10,4 @@ httpx==0.28.1
 alembic==1.15.2
 fpdf2==2.8.3
 cloudinary==1.41.0
+pillow==11.3.0
