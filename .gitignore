@@ -52,5 +52,6 @@ Thumbs.db
 *.swp
 *~
 
-# ── Uploads locaux (si applicable) ───────────────────────────────────────────
-uploads/
+# ── Uploads locaux ───────────────────────────────────────────────────────────
+# Les images produits (uploads/) sont versionnées volontairement : le dépôt
+# sert de sauvegarde si le serveur est perdu.

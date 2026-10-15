@@ -13,7 +13,7 @@ exec gunicorn main:app \
   --worker-class uvicorn.workers.UvicornWorker \
   --bind "0.0.0.0:${PORT:-8000}" \
   --timeout 30 \
-  --keepalive 5 \
+  --keep-alive 5 \
   --max-requests 1000 \
   --max-requests-jitter 100 \
   --log-level info \
