@@ -66,7 +66,8 @@ class OrderItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"))
-    product_id = Column(Integer, nullable=False)
+    product_id = Column(Integer, nullable=True)   # null pour une ligne « pack »
+    pack_id    = Column(Integer, nullable=True)   # renseigné quand la ligne est un pack
     product_name = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False)
     price = Column(Float, nullable=False)
@@ -74,6 +75,66 @@ class OrderItem(Base):
     color = Column(String, nullable=True)
 
     order = relationship("Order", back_populates="items")
+
+
+class Pack(Base):
+    """Lot de plusieurs produits vendu à un prix groupé."""
+    __tablename__ = "packs"
+    __table_args__ = (
+        Index("ix_packs_created_at", "created_at"),
+    )
+
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    price       = Column(Float, nullable=False)          # prix du pack
+    images      = Column(JSON, default=list)
+    is_active   = Column(Boolean, default=True)          # visible sur la boutique
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+    items = relationship(
+        "PackItem", back_populates="pack",
+        cascade="all, delete-orphan", order_by="PackItem.id", lazy="selectin",
+    )
+
+
+class PackItem(Base):
+    __tablename__ = "pack_items"
+    __table_args__ = (
+        Index("ix_pack_items_pack_id", "pack_id"),
+    )
+
+    id         = Column(Integer, primary_key=True, index=True)
+    pack_id    = Column(Integer, ForeignKey("packs.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    quantity   = Column(Integer, nullable=False, default=1)
+
+    pack    = relationship("Pack", back_populates="items")
+    product = relationship("Product", lazy="selectin")
+
+
+class PartnerApplication(Base):
+    """Candidature d'un installateur souhaitant devenir partenaire."""
+    __tablename__ = "partner_applications"
+    __table_args__ = (
+        Index("ix_partner_applications_created_at", "created_at"),
+        Index("ix_partner_applications_status", "status"),
+    )
+
+    id               = Column(Integer, primary_key=True, index=True)
+    full_name        = Column(String, nullable=False)
+    company          = Column(String, nullable=True)
+    phone            = Column(String, nullable=False)
+    email            = Column(String, nullable=False)
+    city             = Column(String, nullable=False)
+    zones            = Column(String, nullable=True)      # zones d'intervention
+    specialties      = Column(JSON, default=list)         # domaines d'installation
+    experience_years = Column(String, nullable=True)
+    team_size        = Column(String, nullable=True)
+    certifications   = Column(Text, nullable=True)
+    message          = Column(Text, nullable=True)
+    status           = Column(String, default="nouveau")  # nouveau | contacte | valide | refuse
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class AdminUser(Base):

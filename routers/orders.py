@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import List
 
 from database import get_db
-from models import Order, OrderItem, Product
+from models import Order, OrderItem, Pack, Product
 from schemas import OrderCreate, OrderUpdate, OrderResponse
 from email_service import send_order_confirmation, send_invoice_email
 
@@ -48,26 +48,37 @@ async def create_order(
     db.add(order)
     await db.flush()  # get order.id before committing
 
-    items = [
-        OrderItem(
+    async def decrement_stock(product_id: int, qty: int) -> None:
+        product = (await db.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+        if product:
+            product.stock = max(0, product.stock - qty)
+
+    items = []
+    for i in order_data.items:
+        name = i.product_name
+        if i.pack_id is not None:
+            pack = (await db.execute(select(Pack).where(Pack.id == i.pack_id))).scalar_one_or_none()
+            if not pack or not pack.is_active:
+                raise HTTPException(status_code=400, detail=f"Pack {i.pack_id} indisponible")
+            # Le nom de la ligne (repris dans les emails et la facture) détaille le contenu du pack
+            contents = ", ".join(f"{it.quantity}× {it.product.name}" for it in pack.items if it.product)
+            name = f"Pack {pack.name} ({contents})" if contents else f"Pack {pack.name}"
+            for it in pack.items:
+                await decrement_stock(it.product_id, it.quantity * i.quantity)
+        else:
+            await decrement_stock(i.product_id, i.quantity)
+
+        items.append(OrderItem(
             order_id     = order.id,
             product_id   = i.product_id,
-            product_name = i.product_name,
+            pack_id      = i.pack_id,
+            product_name = name,
             quantity     = i.quantity,
             price        = i.price,
             size         = i.size,
             color        = i.color,
-        )
-        for i in order_data.items
-    ]
+        ))
     db.add_all(items)
-
-    # Décrémenter le stock de chaque produit commandé
-    for i in order_data.items:
-        prod_result = await db.execute(select(Product).where(Product.id == i.product_id))
-        product = prod_result.scalar_one_or_none()
-        if product:
-            product.stock = max(0, product.stock - i.quantity)
 
     await db.commit()
 

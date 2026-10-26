@@ -682,3 +682,90 @@ async def send_devis_notification(devis_data: dict) -> None:
         for r in results:
             if isinstance(r, Exception):
                 logger.error("Erreur envoi email devis : %s", r)
+
+
+# ── Candidatures partenaires installateurs ────────────────────────────────────
+
+def _partner_rows(d: dict) -> list[tuple]:
+    from html import escape
+    e = lambda v: escape(str(v)) if v else "—"  # noqa: E731
+    return [
+        ("Nom complet",           e(d["full_name"]),                       True,  ""),
+        ("Entreprise",            e(d.get("company")),                     False, ""),
+        ("Téléphone",             e(d["phone"]),                           False, ""),
+        ("Email",                 e(d["email"]),                           False, ""),
+        ("Ville",                 e(d["city"]),                            False, ""),
+        ("Zones d'intervention",  e(d.get("zones")),                       False, ""),
+        ("Spécialités",           e(", ".join(d.get("specialties") or [])), False, C_AMBER),
+        ("Expérience",            e(d.get("experience_years")),            False, ""),
+        ("Taille de l'équipe",    e(d.get("team_size")),                   False, ""),
+        ("Certifications",        e(d.get("certifications")),              False, ""),
+    ]
+
+
+def _build_partner_admin_email(d: dict) -> str:
+    from html import escape
+    message = escape(d.get("message") or "")
+    body = f"""
+    {_header("🤝 Nouvelle candidature partenaire", "Un installateur souhaite rejoindre le réseau")}
+    <div style="padding:24px;background:#ffffff">
+      {_section_title("Profil de l'installateur")}
+      {_info_table(_partner_rows(d))}
+      {f'''{_section_title("Message")}
+      <div style="background:{C_BG};border:1px solid {C_BORDER};border-radius:10px;padding:18px 20px;margin:16px 0">
+        <p style="margin:0;font-size:14px;color:{C_TEXT};line-height:1.7;white-space:pre-wrap">{message}</p>
+      </div>''' if message else ""}
+      <div style="text-align:center;margin:24px 0 8px">
+        <a href="mailto:{escape(d['email'])}"
+           style="display:inline-block;background:{C_AMBER};color:{C_DARK};
+                  padding:12px 32px;border-radius:30px;font-weight:700;
+                  font-size:14px;text-decoration:none">
+          Répondre au candidat
+        </a>
+      </div>
+    </div>
+    {_footer()}"""
+    return _wrap(body)
+
+
+def _build_partner_client_email(d: dict) -> str:
+    from html import escape
+    body = f"""
+    {_header("✅ Candidature reçue", "Merci de votre intérêt pour le réseau Genetics")}
+    <div style="padding:24px;background:#ffffff">
+      <p style="color:{C_TEXT};font-size:15px;margin:0 0 16px">
+        Bonjour <strong>{escape(d["full_name"])}</strong>,
+      </p>
+      <p style="color:{C_TEXT};font-size:14px;line-height:1.7;margin:0 0 16px">
+        Nous avons bien reçu votre candidature pour devenir <strong style="color:{C_AMBER}">partenaire
+        installateur</strong> de Groupe Genetics. Notre équipe étudie votre profil et vous contactera
+        au <strong>{escape(d["phone"])}</strong> ou par email dans les meilleurs délais.
+      </p>
+      {_section_title("Récapitulatif de votre candidature")}
+      {_info_table(_partner_rows(d))}
+      <p style="color:{C_MUTED};font-size:13px;margin:20px 0 0">
+        Pour toute question, écrivez-nous à
+        <a href="mailto:market@groupegenetics.com" style="color:{C_AMBER}">market@groupegenetics.com</a>.
+      </p>
+    </div>
+    {_footer()}"""
+    return _wrap(body)
+
+
+async def send_partner_notification(data: dict) -> None:
+    logger.info("Envoi emails candidature partenaire — candidat: %s | notif: %s",
+                data["email"], ORDERS_EMAIL)
+    async with httpx.AsyncClient() as client:
+        tasks = [
+            _send(client, data["email"], data["full_name"],
+                  "✅ Votre candidature partenaire — Groupe Genetics",
+                  _build_partner_client_email(data)),
+        ]
+        if ORDERS_EMAIL:
+            tasks.append(_send(client, ORDERS_EMAIL, "Groupe Genetics — Partenaires",
+                               f"🤝 Candidature partenaire — {data['full_name']} ({data['city']})",
+                               _build_partner_admin_email(data)))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error("Erreur envoi email partenaire : %s", r)

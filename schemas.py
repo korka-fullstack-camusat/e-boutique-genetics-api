@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -57,19 +57,114 @@ class ProductResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Packs ─────────────────────────────────────────────────────────────────────
+
+class PackItemIn(BaseModel):
+    product_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class PackCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    price: float = Field(..., gt=0)
+    images: Optional[List[str]] = []
+    is_active: bool = True
+    items: List[PackItemIn] = Field(..., min_length=1)
+
+
+class PackUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    images: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+    items: Optional[List[PackItemIn]] = Field(None, min_length=1)
+
+
+class PackItemResponse(BaseModel):
+    product_id: int
+    quantity: int
+    product_name: str
+    product_price: float
+    product_image: Optional[str] = None
+    product_stock: int = 0
+
+
+class PackResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: float
+    images: List[str] = []
+    is_active: bool
+    created_at: datetime
+    items: List[PackItemResponse] = []
+    regular_price: float          # somme des prix unitaires × quantités
+    savings: float                # regular_price - price (≥ 0)
+    stock: int                    # nombre de packs réalisables avec le stock actuel
+
+
+# ── Partenaires installateurs ─────────────────────────────────────────────────
+
+class PartnerApplicationCreate(BaseModel):
+    full_name: str = Field(..., min_length=2)
+    company: Optional[str] = None
+    phone: str = Field(..., min_length=6)
+    email: str = Field(..., min_length=5)
+    city: str = Field(..., min_length=2)
+    zones: Optional[str] = None
+    specialties: List[str] = Field(..., min_length=1)
+    experience_years: str
+    team_size: Optional[str] = None
+    certifications: Optional[str] = None
+    message: Optional[str] = None
+
+
+class PartnerApplicationUpdate(BaseModel):
+    status: str = Field(..., pattern="^(nouveau|contacte|valide|refuse)$")
+
+
+class PartnerApplicationResponse(BaseModel):
+    id: int
+    full_name: str
+    company: Optional[str] = None
+    phone: str
+    email: str
+    city: str
+    zones: Optional[str] = None
+    specialties: List[str] = []
+    experience_years: Optional[str] = None
+    team_size: Optional[str] = None
+    certifications: Optional[str] = None
+    message: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Orders ────────────────────────────────────────────────────────────────────
 
 class OrderItemCreate(BaseModel):
-    product_id: int
+    product_id: Optional[int] = None
+    pack_id: Optional[int] = None
     product_name: str
     quantity: int
     price: float
     size: Optional[str] = None
     color: Optional[str] = None
 
+    @model_validator(mode="after")
+    def _product_or_pack(self):
+        if (self.product_id is None) == (self.pack_id is None):
+            raise ValueError("Chaque ligne doit référencer soit un produit, soit un pack")
+        return self
+
 
 class OrderItemResponse(BaseModel):
-    product_id: int
+    product_id: Optional[int] = None
+    pack_id: Optional[int] = None
     product_name: str
     quantity: int
     price: float
