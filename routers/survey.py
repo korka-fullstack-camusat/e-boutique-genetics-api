@@ -5,12 +5,13 @@ from typing import List
 
 from database import get_db
 from models import Survey
+from routers.admin_users import require_admin
 from schemas import SurveyCreate, SurveyResponse
 
 router = APIRouter()
 
 
-@router.get("/surveys/", response_model=List[SurveyResponse])
+@router.get("/surveys/", response_model=List[SurveyResponse], dependencies=[Depends(require_admin)])
 async def get_all_surveys(db: AsyncSession = Depends(get_db)):
     """Lister tous les sondages (admin)"""
     result = await db.execute(select(Survey).order_by(Survey.created_at.desc()))
@@ -27,7 +28,7 @@ async def create_survey(survey: SurveyCreate, db: AsyncSession = Depends(get_db)
     return db_survey
 
 
-@router.get("/surveys/{survey_id}", response_model=SurveyResponse)
+@router.get("/surveys/{survey_id}", response_model=SurveyResponse, dependencies=[Depends(require_admin)])
 async def get_survey_by_id(survey_id: int, db: AsyncSession = Depends(get_db)):
     """Récupérer un sondage par ID"""
     result = await db.execute(select(Survey).where(Survey.id == survey_id))
@@ -37,7 +38,7 @@ async def get_survey_by_id(survey_id: int, db: AsyncSession = Depends(get_db)):
     return survey
 
 
-@router.delete("/surveys/{survey_id}")
+@router.delete("/surveys/{survey_id}", dependencies=[Depends(require_admin)])
 async def delete_survey(survey_id: int, db: AsyncSession = Depends(get_db)):
     """Supprimer un sondage"""
     result = await db.execute(select(Survey).where(Survey.id == survey_id))

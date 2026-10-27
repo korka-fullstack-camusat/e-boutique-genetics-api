@@ -4,8 +4,10 @@ from pathlib import Path
 
 import cloudinary
 import cloudinary.uploader
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from typing import List
+
+from routers.admin_users import require_admin
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -37,7 +39,7 @@ def _cloudinary_configured() -> bool:
     ])
 
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(require_admin)])
 async def upload_images(files: List[UploadFile] = File(...)):
     """Upload images to Cloudinary (si configuré) ou sur le disque du serveur, et retourne leurs URLs"""
     use_cloudinary = _cloudinary_configured()

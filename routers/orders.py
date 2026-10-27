@@ -14,7 +14,7 @@ from routers.settings import get_maintenance
 router = APIRouter()
 
 
-@router.get("/", response_model=List[OrderResponse])
+@router.get("/", response_model=List[OrderResponse], dependencies=[Depends(require_admin)])
 async def get_orders(db: AsyncSession = Depends(get_db)):
     """Get all orders with their items"""
     result = await db.execute(
@@ -123,7 +123,7 @@ async def create_order(
     return {"message": "Order created successfully", "order_id": order.id, "invoice_number": order.invoice_number}
 
 
-@router.get("/{order_id}", response_model=OrderResponse)
+@router.get("/{order_id}", response_model=OrderResponse, dependencies=[Depends(require_admin)])
 async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
     """Get a single order by ID with its items"""
     result = await db.execute(
@@ -135,7 +135,7 @@ async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
     return order
 
 
-@router.post("/{order_id}/send-invoice")
+@router.post("/{order_id}/send-invoice", dependencies=[Depends(require_admin)])
 async def send_order_invoice(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -173,7 +173,7 @@ async def send_order_invoice(
     return {"message": "Facture envoyée avec succès"}
 
 
-@router.patch("/{order_id}", response_model=OrderResponse)
+@router.patch("/{order_id}", response_model=OrderResponse, dependencies=[Depends(require_admin)])
 async def update_order_status(order_id: int, updates: OrderUpdate, db: AsyncSession = Depends(get_db)):
     """Update order status"""
     result = await db.execute(

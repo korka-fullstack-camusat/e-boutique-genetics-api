@@ -39,7 +39,8 @@ async def get_products(
     return products
 
 
-@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_admin)])
 async def create_product(product: ProductCreate, db: AsyncSession = Depends(get_db)):
     """Create a new product"""
     db_product = Product(**product.model_dump())
@@ -66,7 +67,7 @@ async def get_product(product_id: int, db: AsyncSession = Depends(get_db)):
     return product
 
 
-@router.put("/{product_id}", response_model=ProductResponse)
+@router.put("/{product_id}", response_model=ProductResponse, dependencies=[Depends(require_admin)])
 async def update_product(product_id: int, updates: ProductUpdate, db: AsyncSession = Depends(get_db)):
     """Update a product"""
     result = await db.execute(select(Product).where(Product.id == product_id))
@@ -80,7 +81,7 @@ async def update_product(product_id: int, updates: ProductUpdate, db: AsyncSessi
     return product
 
 
-@router.delete("/{product_id}")
+@router.delete("/{product_id}", dependencies=[Depends(require_admin)])
 async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a product"""
     result = await db.execute(select(Product).where(Product.id == product_id))
