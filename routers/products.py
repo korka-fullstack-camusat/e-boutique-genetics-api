@@ -5,7 +5,8 @@ from typing import Optional, List
 
 from database import get_db
 from models import Product
-from schemas import ProductCreate, ProductUpdate, ProductResponse
+from routers.admin_users import require_admin
+from schemas import ProductCreate, ProductUpdate, ProductResponse, ProductCost
 
 router = APIRouter()
 
@@ -46,6 +47,13 @@ async def create_product(product: ProductCreate, db: AsyncSession = Depends(get_
     await db.commit()
     await db.refresh(db_product)
     return db_product
+
+
+@router.get("/admin/costs", response_model=List[ProductCost], dependencies=[Depends(require_admin)])
+async def get_product_costs(db: AsyncSession = Depends(get_db)):
+    """Prix d'achat de tous les produits (administration uniquement)."""
+    result = await db.execute(select(Product.id, Product.cost_price))
+    return [ProductCost(id=pid, cost_price=cost) for pid, cost in result.all()]
 
 
 @router.get("/{product_id}", response_model=ProductResponse)

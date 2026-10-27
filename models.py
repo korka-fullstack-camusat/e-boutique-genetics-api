@@ -29,6 +29,7 @@ class Product(Base):
     reference      = Column(String, nullable=True)
     marque         = Column(String, nullable=True)
     disponibilite  = Column(String, nullable=True)   # "24h" | "48h" | "72h"
+    cost_price     = Column(Float, nullable=True)    # prix d'achat — jamais exposé sur l'API publique
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -71,6 +72,7 @@ class OrderItem(Base):
     product_name = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False)
     price = Column(Float, nullable=False)
+    unit_cost = Column(Float, nullable=True)      # prix d'achat unitaire au moment de la vente
     size = Column(String, nullable=True)
     color = Column(String, nullable=True)
 
@@ -135,6 +137,15 @@ class PartnerApplication(Base):
     message          = Column(Text, nullable=True)
     status           = Column(String, default="nouveau")  # nouveau | contacte | valide | refuse
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AppSetting(Base):
+    """Réglages globaux de la boutique (ex. mode maintenance), stockés en JSON par clé."""
+    __tablename__ = "app_settings"
+
+    key        = Column(String, primary_key=True)
+    value      = Column(JSON, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class AdminUser(Base):

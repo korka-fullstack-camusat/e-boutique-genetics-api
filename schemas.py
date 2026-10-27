@@ -19,6 +19,7 @@ class ProductCreate(BaseModel):
     reference: Optional[str] = None
     marque: Optional[str] = None
     disponibilite: Optional[str] = None
+    cost_price: Optional[float] = Field(None, ge=0)
 
 
 class ProductUpdate(BaseModel):
@@ -35,6 +36,7 @@ class ProductUpdate(BaseModel):
     reference: Optional[str] = None
     marque: Optional[str] = None
     disponibilite: Optional[str] = None
+    cost_price: Optional[float] = Field(None, ge=0)
 
 
 class ProductResponse(BaseModel):
@@ -209,6 +211,31 @@ class OrderResponse(BaseModel):
     items: List[OrderItemResponse] = []
 
     model_config = {"from_attributes": True}
+
+
+class ProductCost(BaseModel):
+    id: int
+    cost_price: Optional[float] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ── Réglages : mode maintenance ───────────────────────────────────────────────
+
+DEFAULT_MAINTENANCE_MESSAGE = (
+    "Notre boutique est en cours de maintenance. Nous revenons très vite — merci de votre patience !"
+)
+
+
+class MaintenanceSetting(BaseModel):
+    enabled: bool = False
+    message: str = DEFAULT_MAINTENANCE_MESSAGE
+    updated_at: Optional[datetime] = None
+
+
+class MaintenanceUpdate(BaseModel):
+    enabled: bool
+    message: Optional[str] = Field(None, max_length=500)
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────

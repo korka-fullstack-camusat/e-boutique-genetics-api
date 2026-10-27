@@ -8,6 +8,8 @@ from database import get_db
 from models import Order, OrderItem, Pack, Product
 from schemas import OrderCreate, OrderUpdate, OrderResponse
 from email_service import send_order_confirmation, send_invoice_email
+from routers.admin_users import require_admin
+from routers.settings import get_maintenance
 
 router = APIRouter()
 
@@ -30,6 +32,8 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new order and send email notification"""
+    if (await get_maintenance(db)).enabled:
+        raise HTTPException(status_code=503, detail="La boutique est en maintenance, les commandes sont suspendues")
     max_invoice_number = (await db.execute(select(func.max(Order.invoice_number)))).scalar() or 0
 
     order = Order(
@@ -48,14 +52,16 @@ async def create_order(
     db.add(order)
     await db.flush()  # get order.id before committing
 
-    async def decrement_stock(product_id: int, qty: int) -> None:
+    async def decrement_stock(product_id: int, qty: int) -> Product | None:
         product = (await db.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
         if product:
             product.stock = max(0, product.stock - qty)
+        return product
 
     items = []
     for i in order_data.items:
         name = i.product_name
+        unit_cost = None  # prix d'achat unitaire figé au moment de la vente (calcul du bénéfice)
         if i.pack_id is not None:
             pack = (await db.execute(select(Pack).where(Pack.id == i.pack_id))).scalar_one_or_none()
             if not pack or not pack.is_active:
@@ -63,10 +69,14 @@ async def create_order(
             # Le nom de la ligne (repris dans les emails et la facture) détaille le contenu du pack
             contents = ", ".join(f"{it.quantity}× {it.product.name}" for it in pack.items if it.product)
             name = f"Pack {pack.name} ({contents})" if contents else f"Pack {pack.name}"
+            costs = [it.product.cost_price * it.quantity if it.product and it.product.cost_price is not None else None
+                     for it in pack.items]
+            unit_cost = sum(costs) if costs and None not in costs else None
             for it in pack.items:
                 await decrement_stock(it.product_id, it.quantity * i.quantity)
         else:
-            await decrement_stock(i.product_id, i.quantity)
+            product = await decrement_stock(i.product_id, i.quantity)
+            unit_cost = product.cost_price if product else None
 
         items.append(OrderItem(
             order_id     = order.id,
@@ -75,6 +85,7 @@ async def create_order(
             product_name = name,
             quantity     = i.quantity,
             price        = i.price,
+            unit_cost    = unit_cost,
             size         = i.size,
             color        = i.color,
         ))
@@ -176,3 +187,18 @@ async def update_order_status(order_id: int, updates: OrderUpdate, db: AsyncSess
     await db.commit()
     await db.refresh(order)
     return order
+
+
+@router.delete("/{order_id}", dependencies=[Depends(require_admin)])
+async def delete_order(order_id: int, db: AsyncSession = Depends(get_db)):
+    """Supprime une commande déjà traitée (validée, expédiée, livrée ou annulée)."""
+    order = (await db.execute(
+        select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
+    )).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    if order.status == "pending":
+        raise HTTPException(status_code=400, detail="Une commande en attente doit d'abord être validée ou rejetée")
+    await db.delete(order)  # les lignes sont supprimées en cascade
+    await db.commit()
+    return {"message": "Commande supprimée"}
